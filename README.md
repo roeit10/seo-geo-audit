@@ -88,6 +88,8 @@
 
 ## מה הסקיל לא עושה
 
+- **מה לא עשינו כאן:** זה הבסיס לפי פרטו (80/20), לא תחליף לחברת SEO. חיבור מלא לעריכה רק לאתר בקוד ולוורדפרס; ב-Wix, Shopify ואחרים הדוח נותן צעדים בעורך. בלי מחקר מילות מפתח, מתחרים, קישורים, מהירות, hreflang או Schema מתקדם.
+
 - **לא מבטיח מקום בגוגל או ציטוט ב-ChatGPT.** הוא מסיר חסמים ובונה את התוכן כך שאפשר לצטט אותו. נראות במנועי AI לוקחת
   בדרך כלל 14-21 יום ויותר, ו-SEO קלאסי הוא הבסיס.
 - **לא בודק מתחרים וקישורים חיצוניים** (דורש כלים בתשלום).
@@ -107,7 +109,8 @@
 | `references/setup.md` | האשף: זיהוי, חיבור, עמודים מרכזיים, עובדות העסק, פרופיל |
 | `references/connect-code.md` | אתר בקוד: איפה מה בכל framework, ענף, build, ציון אחרי, העלאה |
 | `references/connect-wordpress.md` | סיסמת אפליקציה, Yoast / Rank Math, גיבוי ותקלות |
-| `references/connect-wix.md` · `connect-shopify.md` · `connect-other.md` | Wix, Shopify, Webflow, Framer, Squarespace |
+| `references/connect-wix.md` · `connect-shopify.md` · `connect-other.md` | Wix, Shopify, Webflow, Framer, Squarespace: איפה מתקנים בעורך (וחיבור API למתקדמים) |
+| `THIRD_PARTY_NOTICES.md` | מה אימצנו מסקילים פתוחים, ורישיונות |
 | `references/ahrefs-rules.md` | כל כלל SEO/GEO עם המקור ב-Ahrefs, ואיך מחושב הציון |
 | `references/fixes.md` | איך מתקנים כל בדיקה בכל פלטפורמה |
 | `references/geo-content.md` | הצעות התוכן: מה, איך, ומה אסור |

@@ -61,9 +61,7 @@ python3 SKILL/scripts/detect.py <האתר> --out seo-geo/detect.json
 |---|---|---|
 | אתר בקוד (Next.js, Astro, HTML...) | `connect-code.md` | `git status` בתיקייה, זיהוי framework, איפה המטא/sitemap/robots, פקודת build |
 | וורדפרס | `connect-wordpress.md` | `python3 SKILL/scripts/wp.py check`: משתמש, הרשאות, תוסף SEO, האם אפשר לכתוב מטא |
-| Wix | `connect-wix.md` | קריאה של רשימת העמודים / האתר דרך Composio או ה-API |
-| Shopify | `connect-shopify.md` | קריאה של עמוד אחד ומוצר אחד |
-| Webflow / Framer / Squarespace / אחר | `connect-other.md` | לפי מה שיש: Webflow API, אחרת אין, וזה בסדר |
+| Wix / Shopify / Webflow / Framer / Squarespace / אחר | **בגרסה הזו בלי חיבור.** הדוח כותב לכל תיקון צעד אחר צעד איפה ללחוץ בעורך (`connect-wix.md`, `connect-shopify.md`, `connect-other.md`). מי שכבר מחובר דרך Composio ורוצה, אפשר לפי אותם קבצים | אין |
 
 צעד שנכשל → אומרים מה חזר במילים פשוטות, את התיקון מטבלת התקלות ב-reference, ושוב בודקים. לא ממשיכים לכתוב לאתר בלי
 בדיקת קריאה שעברה.
