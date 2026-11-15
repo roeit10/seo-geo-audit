@@ -37,16 +37,25 @@ VERSION = "1.0"
 UA = "Mozilla/5.0 (compatible; seo-geo-audit/1.0; +https://github.com/roeit10/seo-geo-audit)"
 UA_TOKEN = "seo-geo-audit"
 
+# AI agents: token, what it is (Hebrew), role, real UA string (None = robots token only).
+# Roles and UA strings adapted from AgriciDaniel/claude-seo, scripts/agentic_check.py (MIT, see THIRD_PARTY_NOTICES.md).
+# role: search / user = blocking them hides the site from AI answers (scored)
+#       training / control = the owner's business choice (reported, lightly weighted)
 AI_BOTS = [
-    # (robots token, what it is, real UA string for the firewall test or None)
-    ("OAI-SearchBot", "החיפוש של ChatGPT", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; OAI-SearchBot/1.0; +https://openai.com/searchbot"),
-    ("ChatGPT-User", "ChatGPT כשמשתמש שולח לינק", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot"),
-    ("GPTBot", "אימון המודלים של OpenAI", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.1; +https://openai.com/gptbot"),
-    ("ClaudeBot", "Claude של Anthropic", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)"),
-    ("PerplexityBot", "Perplexity", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)"),
-    ("Google-Extended", "Gemini (ההרשאה של גוגל ל-AI)", None),
+    ("OAI-SearchBot", "החיפוש של ChatGPT", "search", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; OAI-SearchBot/1.3; +https://openai.com/searchbot)"),
+    ("ChatGPT-User", "ChatGPT כשמשתמש שולח לינק", "user", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ChatGPT-User/1.0; +https://openai.com/bot)"),
+    ("Claude-SearchBot", "החיפוש של Claude", "search", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-SearchBot/1.0; +claudebot@anthropic.com)"),
+    ("Claude-User", "Claude כשמשתמש שולח לינק", "user", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +claudebot@anthropic.com)"),
+    ("PerplexityBot", "Perplexity", "search", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)"),
+    ("GPTBot", "אימון המודלים של OpenAI", "training", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.3; +https://openai.com/gptbot)"),
+    ("ClaudeBot", "אימון המודלים של Anthropic", "training", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)"),
+    ("CCBot", "Common Crawl (מאגר לאימון)", "training", None),
+    ("Google-Extended", "הרשאה של גוגל לאימון Gemini (לא משפיע על החיפוש)", "control", None),
+    ("Applebot-Extended", "הרשאה של אפל לאימון", "control", None),
 ]
-SEARCH_BOTS = {"OAI-SearchBot", "ChatGPT-User", "PerplexityBot"}  # blocking these hides you from AI answers
+SEARCH_BOTS = {t for t, _, r, _ in AI_BOTS if r in ("search", "user")}
+# Hebrew/English openers that delay the answer (idea from seo-skills/geo-audit-skill thresholds.json, MIT)
+FILLER_OPENERS = re.compile(r"^\s*(במאמר (הזה|זה)|בעמוד (הזה|זה)|בימינו|כידוע|בעולם של היום|ברוכים הבאים|אנחנו שמחים|in this article|nowadays|welcome to)", re.I)
 
 CATEGORIES = [
     # id, Hebrew name, weight in total score, one plain line for business owners
@@ -428,9 +437,19 @@ class Audit:
 
     def check_sitemap_urls(self):
         src = "ahrefs.com/blog/how-to-create-a-sitemap/"
-        urls = self.sitemap_urls[: self.args.max_sitemap_check]
-        if not urls:
+        if not self.sitemap_urls:
             return
+        sm = {self.norm(u).rstrip("/") for u in self.sitemap_urls}
+        missing = [u for u in self.key_pages if u.rstrip("/") not in sm and not self.pages.get(u, {}).get("noindex")]
+        self.add("sitemap_has_key", "crawl", 2, "כל העמודים המרכזיים נמצאים במפת האתר",
+                 "pass" if not missing else "fail", 1 - len(missing) / max(len(self.key_pages), 1),
+                 f"{len(missing)} עמודים מרכזיים חסרים במפה." if missing else "כולם במפה.", missing,
+                 fix="sitemap", source=src)
+        # status check: the key pages that are in the sitemap + an even sample of the rest
+        n = self.args.max_sitemap_check
+        rest = [u for u in self.sitemap_urls if self.norm(u).rstrip("/") not in {k.rstrip("/") for k in self.key_pages}]
+        step = max(1, len(rest) // max(n, 1))
+        urls = [u for u in self.sitemap_urls if self.norm(u).rstrip("/") in {k.rstrip("/") for k in self.key_pages}] + rest[::step][:n]
         bad = []
 
         def one(u):
@@ -442,10 +461,10 @@ class Audit:
                 if st != 200:
                     bad.append(f"{u} ({st})")
         sc = 1 - len(bad) / len(urls)
-        self.add("sitemap_urls_ok", "crawl", 3, "כל הכתובות במפת האתר מחזירות 200 (בלי הפניות ושגיאות)",
+        self.add("sitemap_urls_ok", "crawl", 3, "הכתובות במפת האתר מחזירות 200 (העמודים המרכזיים + מדגם)",
                  "pass" if not bad else ("warn" if sc > 0.9 else "fail"), sc,
                  f"נבדקו {len(urls)} כתובות, {len(bad)} לא החזירו 200." + (
-                     f" (נבדקו רק {len(urls)} מתוך {len(self.sitemap_urls)})" if len(urls) < len(self.sitemap_urls) else ""),
+                     f" (מדגם: {len(urls)} מתוך {len(self.sitemap_urls)})" if len(urls) < len(self.sitemap_urls) else ""),
                  bad, fix="sitemap", source=src, value={"checked": len(urls), "bad": len(bad)})
 
     # ------------------------------------------------------------------ choose + crawl pages
@@ -470,12 +489,14 @@ class Audit:
             if self.internal(absu) and not re.search(r"\.(pdf|jpe?g|png|zip)$|#|mailto:|tel:", absu):
                 nav.append(self.norm(absu))
         if not self.args.key_pages:
-            key += [u for u in dict.fromkeys(nav)][:6]
+            # no list given: home + the main menu, up to max_pages (the onboarding shows these for approval)
+            key += [u for u in dict.fromkeys(nav)]
         key = list(dict.fromkeys(self.norm(u) for u in key))
-        rest = [self.norm(u) for u in self.sitemap_urls if self.internal(u)]
-        rest += nav
-        chosen = list(dict.fromkeys(key + rest))[: self.args.max_pages]
-        self.key_pages = [u for u in key if u in chosen]
+        self.nav_candidates = list(dict.fromkeys(nav))
+        chosen = key[: self.args.max_pages]
+        if len(key) > len(chosen):
+            self.notes.append(f"נבדקו {len(chosen)} עמודים מרכזיים. {len(key) - len(chosen)} עמודים נוספים מהתפריט לא נבדקו (מגבלה: {self.args.max_pages}).")
+        self.key_pages = chosen
         # respect robots for our own UA
         allowed = [u for u in chosen if self.rp is None or self.rp.can_fetch(UA_TOKEN, u)]
         skipped = len(chosen) - len(allowed)
@@ -744,48 +765,53 @@ class Audit:
                      source="ahrefs.com/blog/schema-markup/")
 
         # GEO (key pages)
-        geo_pages = [u for u in key if u in idx_pages] or list(idx_pages)[:5]
-        g = max(len(geo_pages), 1)
-        no_answer, no_q, no_faq, no_upd, thin = [], [], [], [], []
-        for u in geo_pages:
-            d = idx_pages[u]
-            blocks = d["p"].blocks
-            # answer-first: a paragraph of 15+ words before the first H2
-            first_h2 = next((i for i, (k, _) in enumerate(blocks) if k == "h2"), len(blocks))
-            intro = [t for k, t in blocks[:first_h2] if k == "p" and words(t) >= 15]
-            if not intro:
-                no_answer.append(u)
-            qs = [t for l, t in d["p"].headings if l in (2, 3) and QUESTION_RE.search(t)]
-            if not qs:
-                no_q.append(u)
-            has_faq = any(FAQ_HEAD_RE.search(t) for _, t in d["p"].headings) or d["p"].details >= 2 or \
-                "FAQPage" in page_types.get(u, [])
-            if not has_faq:
-                no_faq.append(u)
-            txt = d["p"].text()
-            mod = any(n.get("dateModified") for n in d.get("ld_nodes", []))
-            if not UPDATED_RE.search(txt) and not mod:
-                no_upd.append(u)
-            if words(txt) < 150:
-                thin.append(f"{u} ({words(txt)} מילים ב-HTML)")
-        self.add("answer_first", "geo", 3, "פסקת תשובה ישירה בראש העמוד, לפני כותרת המשנה הראשונה",
-                 "pass" if not no_answer else "warn", 1 - len(no_answer) / g,
-                 f"{len(no_answer)} מתוך {len(geo_pages)} עמודים מרכזיים פותחים בלי פסקה שעונה מה העסק עושה. "
-                 "44% מהציטוטים ב-ChatGPT מגיעים מ-30% הראשונים של העמוד.", no_answer, fix="geo",
-                 source="ahrefs.com/blog/how-to-rank-on-chatgpt/")
-        self.add("question_headings", "geo", 2, "כותרות משנה בניסוח של שאלה", "pass" if not no_q else "warn",
-                 1 - len(no_q) / g, f"{len(no_q)} עמודים מרכזיים בלי אף כותרת-שאלה. כותרות-שאלה מצוטטות פי 2.",
-                 no_q, fix="geo", source="ahrefs.com/blog/h1-tag/")
-        self.add("faq_block", "geo", 2, "בלוק שאלות נפוצות גלוי בעמודים המרכזיים", "pass" if not no_faq else "warn",
-                 1 - len(no_faq) / g, f"{len(no_faq)} עמודים מרכזיים בלי שאלות ותשובות.", no_faq, fix="geo",
-                 source="ahrefs.com/blog/how-to-rank-on-chatgpt/")
-        self.add("freshness", "geo", 1.5, "\"עודכן לאחרונה\" גלוי או dateModified", "pass" if not no_upd else "warn",
-                 1 - len(no_upd) / g, f"{len(no_upd)} עמודים מרכזיים בלי תאריך עדכון.", no_upd, fix="geo",
-                 source="ahrefs.com/blog/fresh-content/")
-        self.add("server_rendered", "ai", 3, "התוכן קיים ב-HTML עצמו (מנועי AI לא מריצים JavaScript)",
-                 "pass" if not thin else "fail", 1 - len(thin) / g,
-                 f"{len(thin)} עמודים מרכזיים עם פחות מ-150 מילים ב-HTML הגולמי. אם התוכן נטען רק ב-JavaScript, ChatGPT לא רואה אותו.",
-                 thin, fix="js_content", source="ahrefs.com/blog/javascript-seo/")
+        geo_pages = [u for u in key if u in idx_pages]
+        if not geo_pages:
+            for cid, cat, wgt, ttl in (("answer_first", "geo", 3, "פסקת תשובה ישירה בראש העמוד"),
+                                        ("server_rendered", "ai", 3, "התוכן קיים ב-HTML עצמו")):
+                self.add(cid, cat, wgt, ttl, "na", 1, "אין עמוד מרכזי שאפשר לבדוק (כולם חסומים לאינדקס או בשגיאה).")
+        else:
+            g = max(len(geo_pages), 1)
+            no_answer, no_q, no_faq, no_upd, thin = [], [], [], [], []
+            for u in geo_pages:
+                d = idx_pages[u]
+                blocks = d["p"].blocks
+                # answer-first: a paragraph of 15+ words before the first H2
+                first_h2 = next((i for i, (k, _) in enumerate(blocks) if k == "h2"), len(blocks))
+                intro = [t for k, t in blocks[:first_h2] if k == "p" and words(t) >= 15 and not FILLER_OPENERS.search(t)]
+                if not intro:
+                    no_answer.append(u)
+                qs = [t for l, t in d["p"].headings if l in (2, 3) and QUESTION_RE.search(t)]
+                if not qs:
+                    no_q.append(u)
+                has_faq = any(FAQ_HEAD_RE.search(t) for _, t in d["p"].headings) or d["p"].details >= 2 or \
+                    "FAQPage" in page_types.get(u, [])
+                if not has_faq:
+                    no_faq.append(u)
+                txt = d["p"].text()
+                mod = any(n.get("dateModified") for n in d.get("ld_nodes", []))
+                if not UPDATED_RE.search(txt) and not mod:
+                    no_upd.append(u)
+                if words(txt) < 150:
+                    thin.append(f"{u} ({words(txt)} מילים ב-HTML)")
+            self.add("answer_first", "geo", 3, "פסקת תשובה ישירה בראש העמוד, לפני כותרת המשנה הראשונה",
+                     "pass" if not no_answer else "warn", 1 - len(no_answer) / g,
+                     f"{len(no_answer)} מתוך {len(geo_pages)} עמודים מרכזיים פותחים בלי פסקה שעונה מה העסק עושה. "
+                     "44% מהציטוטים ב-ChatGPT מגיעים מ-30% הראשונים של העמוד.", no_answer, fix="geo",
+                     source="ahrefs.com/blog/how-to-rank-on-chatgpt/")
+            self.add("question_headings", "geo", 2, "כותרות משנה בניסוח של שאלה", "pass" if not no_q else "warn",
+                     1 - len(no_q) / g, f"{len(no_q)} עמודים מרכזיים בלי אף כותרת-שאלה. כותרות-שאלה מצוטטות פי 2.",
+                     no_q, fix="geo", source="ahrefs.com/blog/h1-tag/")
+            self.add("faq_block", "geo", 2, "בלוק שאלות נפוצות גלוי בעמודים המרכזיים", "pass" if not no_faq else "warn",
+                     1 - len(no_faq) / g, f"{len(no_faq)} עמודים מרכזיים בלי שאלות ותשובות.", no_faq, fix="geo",
+                     source="ahrefs.com/blog/how-to-rank-on-chatgpt/")
+            self.add("freshness", "geo", 1.5, "\"עודכן לאחרונה\" גלוי או dateModified", "pass" if not no_upd else "warn",
+                     1 - len(no_upd) / g, f"{len(no_upd)} עמודים מרכזיים בלי תאריך עדכון.", no_upd, fix="geo",
+                     source="ahrefs.com/blog/fresh-content/")
+            self.add("server_rendered", "ai", 3, "התוכן קיים ב-HTML עצמו (מנועי AI לא מריצים JavaScript)",
+                     "pass" if not thin else "fail", 1 - len(thin) / g,
+                     f"{len(thin)} עמודים מרכזיים עם פחות מ-150 מילים ב-HTML הגולמי. אם התוכן נטען רק ב-JavaScript, ChatGPT לא רואה אותו.",
+                     thin, fix="js_content", source="ahrefs.com/blog/javascript-seo/")
 
         # tech
         mixed, big, nov = [], [], []
@@ -822,9 +848,9 @@ class Audit:
                 if self.internal(absu):
                     linked.add(self.norm(absu).rstrip("/"))
         orphans = [u for u in idx_pages if u.rstrip("/") not in linked and u.rstrip("/") != self.public]
-        self.add("internal_links", "crawl", 1, "כל עמוד מקבל לפחות קישור פנימי אחד (מתוך העמודים שנסרקו)",
+        self.add("internal_links", "crawl", 1, "כל עמוד מרכזי מקושר מעמוד הבית או מעמוד מרכזי אחר",
                  "pass" if not orphans else "warn", 1 - len(orphans) / m,
-                 f"{len(orphans)} עמודים שאף עמוד שנסרק לא מקשר אליהם (בדיקה חלקית, רק על {len(idx_pages)} עמודים).",
+                 f"{len(orphans)} עמודים מרכזיים שאף עמוד מרכזי לא מקשר אליהם.",
                  orphans, fix="links", source="ahrefs.com/blog/seo-issues/")
 
         self.idx_pages = idx_pages
@@ -862,7 +888,7 @@ class Audit:
         # AI bots through the firewall (real user agents)
         blocked = []
         base_status = self.home_fetch["status"] if getattr(self, "home_fetch", None) else 200
-        for tok, name, ua in AI_BOTS:
+        for tok, name, role, ua in AI_BOTS:
             if not ua:
                 continue
             r = fetch(self.public + "/", ua=ua, max_bytes=20000)
@@ -871,7 +897,7 @@ class Audit:
             if challenged and base_status == 200:
                 blocked.append(f"{tok} ({name}): {r['status']}")
         self.add("ai_firewall", "ai", 2, "חומת האש לא חוסמת בוטים של AI (בדיקה עם ה-User-Agent האמיתי)",
-                 "pass" if not blocked else "fail", 1 - len(blocked) / 5,
+                 "pass" if not blocked else "fail", 1 - len(blocked) / len([1 for b in AI_BOTS if b[3]]),
                  ("נחסמו: " + "; ".join(blocked)) if blocked else "כל הבוטים קיבלו את העמוד.", blocked,
                  fix="ai_bots", source="ahrefs.com/aeo/technical-aeo", live_only=True)
 
@@ -880,20 +906,25 @@ class Audit:
             return
         key = self.key_pages or [self.public + "/"]
         rows, blocked_search, blocked_train = [], [], []
-        for tok, name, _ in AI_BOTS:
+        for tok, name, role, _ in AI_BOTS:
             can = all(self.rp.can_fetch(tok, u) for u in key)
             explicit = bool(re.search(r"user-agent:\s*" + re.escape(tok) + r"\b", self.robots_txt or "", re.I))
-            rows.append({"bot": tok, "what": name, "allowed": can, "explicit": explicit})
+            rows.append({"bot": tok, "what": name, "role": role, "allowed": can, "explicit": explicit})
             if not can:
                 (blocked_search if tok in SEARCH_BOTS else blocked_train).append(f"{tok} ({name})")
         st = "fail" if blocked_search else ("warn" if blocked_train else "pass")
-        sc = 1 - 0.3 * len(blocked_search) - 0.1 * len(blocked_train)
+        sc = 1 - 0.25 * len(blocked_search) - 0.05 * len(blocked_train)
         detail = ("חסומים בוטים של חיפוש AI: " + ", ".join(blocked_search) + ". " if blocked_search else "") + \
                  ("חסומים בוטים של אימון (בחירה של בעל האתר): " + ", ".join(blocked_train) + "." if blocked_train else "")
         if not detail:
             detail = "כל בוטי ה-AI מורשים ב-robots.txt" + (" (דרך הכלל הכללי *, בלי אזכור מפורש)." if not any(r["explicit"] for r in rows) else ".")
         self.add("ai_robots", "ai", 3, "robots.txt מאפשר ל-ChatGPT, Claude ו-Perplexity לקרוא את האתר", st, sc,
                  detail, blocked_search + blocked_train, fix="ai_bots", source="ahrefs.com/aeo/technical-aeo", value=rows)
+        # Cloudflare "managed robots.txt" silently blocks AI bots (idea: zubair-trabzada/geo-seo-claude, MIT)
+        if "cloudflare managed content" in (self.robots_txt or "").lower():
+            self.add("cloudflare_managed", "ai", 1, "robots.txt בלי חסימות שהוסיף Cloudflare אוטומטית", "warn", 0.5,
+                     "ב-robots.txt יש בלוק 'Cloudflare Managed content' שמוסיפה ההגדרה של Cloudflare לחסימת בוטים של AI. "
+                     "בדקו אם זה בכוונה: Cloudflare > Security > Bots.", fix="ai_bots", source="ahrefs.com/aeo/technical-aeo")
         # llms.txt - informational only
         r = fetch(self.base + "/llms.txt", max_bytes=2000)
         has = r["status"] == 200 and "html" not in r["headers"].get("content-type", "")
@@ -931,6 +962,14 @@ class Audit:
                          "warns": sum(1 for c in cs if c["status"] == "warn")}
         valid = [(v["weight"], v["score"]) for v in cats.values() if v["score"] is not None]
         total = round(sum(w * s for w, s in valid) / sum(w for w, _ in valid)) if valid else 0
+        # a blocker on a key page (noindex, error, robots blocks the site) caps the total at 60
+        # (rubric idea from umutxyp/Seo-Promt-Master docs/11-scoring-rubric.md, MIT)
+        blockers = [c["id"] for c in self.checks if c["status"] == "fail" and c["id"] in
+                    ("noindex", "pages_status", "robots_blocks_site", "ai_robots", "server_rendered")]
+        self.blockers = blockers
+        if blockers and total > 60:
+            self.notes.append("יש חסם בעמוד מרכזי (" + ", ".join(blockers) + "), ולכן הציון הכולל מוגבל ל-60 עד שהוא מתוקן.")
+            total = 60
         return total, cats
 
     def run(self):
@@ -941,8 +980,8 @@ class Audit:
         urls = self.choose_pages()
         self.crawl(urls)
         t_crawl = time.time()
-        self.check_sitemap_urls()
         self.page_checks()
+        self.check_sitemap_urls()
         self.robots_ai()
         self.live_checks()
         if self.args.inherit_live:
@@ -950,6 +989,14 @@ class Audit:
         total, cats = self.score()
         sev = {"fail": 0, "warn": 1, "pass": 2, "info": 3, "na": 4}
         self.checks.sort(key=lambda c: (sev.get(c["status"], 5), -c["weight"] * (1 - c["score"])))
+        issues = {u: [] for u in self.pages}
+        for c in self.checks:
+            if c["status"] in ("fail", "warn"):
+                for ev in c.get("evidence", []):
+                    for u in issues:
+                        if ev == u or ev.startswith(u + " ") or ev.startswith(u + ":") or ev.startswith(u + " →"):
+                            if c["title"] not in issues[u]:
+                                issues[u].append(c["title"])
         pages_out = []
         for u, d in self.pages.items():
             p = d["p"]
@@ -962,13 +1009,15 @@ class Audit:
                 "images_no_alt": sum(1 for i in p.imgs if "alt" not in i),
                 "schema_types": self.page_types.get(u, []) if hasattr(self, "page_types") else [],
                 "ttfb_ms": round(d["fetch"]["ttfb"] * 1000) if d["fetch"]["ttfb"] else None,
+                "faq": any(FAQ_HEAD_RE.search(t) for _, t in p.headings) or "FAQPage" in (self.page_types.get(u, []) if hasattr(self, "page_types") else []),
+                "issues": issues.get(u, []),
             })
         return {
             "tool": "seo-geo-audit", "version": VERSION,
             "site": self.public, "fetched_from": self.base, "mode": "local-build" if self.local else "live",
             "date": time.strftime("%Y-%m-%d %H:%M"),
             "score": total, "categories": cats,
-            "summary": {"pages_crawled": len(self.pages), "key_pages": self.key_pages,
+            "summary": {"pages_crawled": len(self.pages), "key_pages": self.key_pages, "nav_candidates": getattr(self, "nav_candidates", []),
                         "sitemap_urls": len(getattr(self, "sitemap_urls", [])),
                         "fails": sum(1 for c in self.checks if c["status"] == "fail"),
                         "warns": sum(1 for c in self.checks if c["status"] == "warn"),
@@ -976,6 +1025,9 @@ class Audit:
             "timings_sec": {"robots_sitemap": round(t_sm - t, 1), "crawl": round(t_crawl - t_sm, 1),
                             "total": round(time.time() - self.t0, 1)},
             "notes": self.notes,
+            "blockers": getattr(self, "blockers", []),
+            "completeness": {"computed": sum(1 for c in self.checks if c["status"] not in ("na",) and c["weight"] > 0),
+                             "not_computed": [c["id"] for c in self.checks if c["status"] == "na"]},
             "validation_links": {
                 "rich_results": "https://search.google.com/test/rich-results?url=" + urllib.parse.quote(self.public + "/", safe=""),
                 "schema_validator": "https://validator.schema.org/#url=" + urllib.parse.quote(self.public + "/", safe=""),
@@ -1017,8 +1069,8 @@ def main():
     ap.add_argument("--url", help="public site URL, e.g. https://example.co.il")
     ap.add_argument("--key-pages", default="", help="comma list of paths: /,/services,/contact")
     ap.add_argument("--brand", default="", help="brand name expected in titles")
-    ap.add_argument("--max-pages", type=int, default=30)
-    ap.add_argument("--max-sitemap-check", type=int, default=300)
+    ap.add_argument("--max-pages", type=int, default=8, help="key pages to audit (3-8 recommended)")
+    ap.add_argument("--max-sitemap-check", type=int, default=10, help="sample of other sitemap URLs to status-check")
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--fetch-base", default="", help="fetch from here instead (local build), keep --url as the public site")
     ap.add_argument("--inherit-live", default="", help="copy live-only checks from a previous JSON (for local builds)")

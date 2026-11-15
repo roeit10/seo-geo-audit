@@ -74,7 +74,7 @@ def main():
     <div class="delta" dir="ltr">{"+" if delta >= 0 else ""}{delta}</div>''')
     w('  </div>')
     s = b["summary"]
-    w(f'  <div class="meta">נסרקו {s["pages_crawled"]} עמודים · {s["sitemap_urls"]} כתובות במפת האתר · '
+    w(f'  <div class="meta">נבדקו {s["pages_crawled"]} עמודים מרכזיים · {s["sitemap_urls"]} כתובות במפת האתר · '
       f'{s["fails"]} לתקן · {s["warns"]} לשפר · {s["passes"]} תקין (לפני)</div>')
     w('</header>')
 
@@ -99,6 +99,34 @@ def main():
     w('<p class="note">הציון מחושב בסקריפט, באותן בדיקות בכל ריצה. אותו אתר = אותו ציון. '
       'משקל כל תחום בציון הכולל: ' + " · ".join(f'{e(v["name"])} {v["weight"]}%' for v in b["categories"].values()) + '.</p>')
     w("</section>")
+
+    # ---------- per key page
+    import urllib.parse as _up
+    bp = {p["url"]: p for p in b.get("pages", [])}
+    ap_ = {p["url"]: p for p in (af or {}).get("pages", [])}
+    if bp:
+        w('<section class="card"><h2>עמוד אחר עמוד</h2><table class="pages"><thead><tr><th>עמוד</th><th>מה נמצא</th>'
+          + ('<th>אחרי</th>' if af else '') + '</tr></thead><tbody>')
+        for u, p in bp.items():
+            path = _up.urlparse(u).path or "/"
+            iss = p.get("issues", [])
+            w(f'<tr><td class="pg"><b dir="ltr">{e(path)}</b><div class="ttl">{e(p.get("title"))}</div></td><td>')
+            w('<span class="pill pass">תקין</span>' if not iss else "<ul>" + "".join(f"<li>{e(i)}</li>" for i in iss) + "</ul>")
+            w("</td>")
+            if af:
+                a2 = ap_.get(u, {})
+                left = a2.get("issues", [])
+                fixed = [i for i in iss if i not in left]
+                cell = []
+                if fixed:
+                    cell.append(f'<span class="pill pass">תוקנו {len(fixed)}</span>')
+                if left:
+                    cell.append("<ul>" + "".join(f"<li>נשאר: {e(i)}</li>" for i in left) + "</ul>")
+                if not iss and not left:
+                    cell.append('<span class="pill pass">תקין</span>')
+                w("<td>" + "".join(cell) + "</td>")
+            w("</tr>")
+        w('</tbody></table><p class="note">רק העמודים המרכזיים נבדקים. בדיקות של כל האתר (robots.txt, מפת האתר, בוטים של AI, HTTPS) מופיעות בהמשך.</p></section>')
 
     # ---------- fixed
     if n.get("fixed"):
@@ -235,6 +263,7 @@ th{{font-size:13px;color:var(--muted);font-weight:600}}
 .detail{{font-size:14px;color:#374151}} .src{{font-size:12px;color:var(--muted)}} .src a{{color:var(--muted)}}
 details{{font-size:13px;margin-top:4px}} details ul{{margin:4px 0;padding-inline-start:18px;word-break:break-all}}
 .snip pre{{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;font-size:13px;text-align:left}}
+.pages .pg{{width:34%}} .pages .ttl{{color:var(--muted);font-size:13px}} .pages ul{{margin:0;padding-inline-start:18px;font-size:14px}}
 .links li{{margin:6px 0}} a{{color:var(--accent)}} .gbp{{background:var(--bg);padding:12px;border-radius:10px}}
 .small{{font-size:14px}} footer{{text-align:center;color:var(--muted);font-size:13px;margin-top:12px}}
 @media (max-width:700px){{.plan{{grid-template-columns:1fr}} .score .num{{font-size:48px}} .cats .plain{{display:none}}}}

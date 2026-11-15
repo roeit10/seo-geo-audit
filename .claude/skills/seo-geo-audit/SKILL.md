@@ -1,6 +1,6 @@
 ---
 name: seo-geo-audit
-description: Audit a business website for classic SEO and for GEO (being cited by ChatGPT, Claude, Perplexity and Google AI Overviews), then fix it on the site's own platform. A deterministic Python checker crawls the site and scores 8 categories 0-100 (crawl and indexing, AI-crawler access, titles and descriptions, heading structure, image alt text, structured data, GEO content, technical), following Ahrefs' rules with sources. First run is a short onboarding that detects the platform (code / Next.js, WordPress, Wix, Shopify, Webflow, Framer, Squarespace), walks the owner through connecting it step by step, confirms key pages and an owner-approved business facts brief, and saves a profile. Then it shows a numbered plan and waits for "מאשר" before any change: code sites are edited on a git branch and built locally (never pushed without a second "מאשר"), WordPress through the REST API with a backup first, Wix / Shopify / others through their API or Composio when possible, otherwise paste-ready snippets and click-by-click steps. Page copy is never rewritten automatically: GEO blocks (answer-first intro, question headings, FAQ, last-updated) are proposed as diffs for approval. Ends with a before/after score and a branded Hebrew HTML + PDF report with a this-week / this-month / this-quarter plan. Use when the user says "תבדוק לי את ה-SEO של האתר", "בדיקת SEO", "SEO ו-GEO", "שהאתר יופיע ב-ChatGPT", "למה גוגל לא מוצא אותי", "תתקן לי את ה-SEO", "מפת אתר", "robots.txt", "תגיות מטא", "audit my website SEO", "GEO audit", "fix my site's SEO", or "/seo-geo-audit".
+description: Audit a business website for classic SEO and for GEO (being cited by ChatGPT, Claude, Perplexity and Google AI Overviews), then fix it on the site's own platform. A deterministic Python checker audits only the key pages the owner confirmed (home, service pages, about/contact; 3-8 pages) plus light site-wide checks (robots.txt, sitemap, AI-crawler access, HTTPS), and scores 8 categories 0-100 (crawl and indexing, AI-crawler access, titles and descriptions, heading structure, image alt text, structured data, GEO content, technical), following Ahrefs' rules with sources. First run is a short onboarding that detects the platform (code / Next.js, WordPress, Wix, Shopify, Webflow, Framer, Squarespace), walks the owner through connecting it step by step, confirms key pages and an owner-approved business facts brief, and saves a profile. Then it shows a numbered plan and waits for "מאשר" before any change: code sites are edited on a git branch and built locally (never pushed without a second "מאשר"), WordPress through the REST API with a backup first, Wix / Shopify / others through their API or Composio when possible, otherwise paste-ready snippets and click-by-click steps. Page copy is never rewritten automatically: GEO blocks (answer-first intro, question headings, FAQ, last-updated) are proposed as diffs for approval. Ends with a before/after score and a branded Hebrew HTML + PDF report with a this-week / this-month / this-quarter plan. Use when the user says "תבדוק לי את ה-SEO של האתר", "בדיקת SEO", "SEO ו-GEO", "שהאתר יופיע ב-ChatGPT", "למה גוגל לא מוצא אותי", "תתקן לי את ה-SEO", "מפת אתר", "robots.txt", "תגיות מטא", "audit my website SEO", "GEO audit", "fix my site's SEO", or "/seo-geo-audit".
 ---
 
 # בדיקת SEO ו-GEO לאתר, ותיקון על הפלטפורמה שלכם
@@ -76,7 +76,10 @@ description: Audit a business website for classic SEO and for GEO (being cited b
 python3 SKILL/scripts/audit.py --url <האתר> --key-pages "<נתיבים מהפרופיל>" --brand "<שם המותג>" --out seo-geo/audit-before.json
 ```
 
-עד 30 עמודים, מכבד robots.txt, בלי מפתחות ובלי שירות בתשלום. אתר רגיל: פחות מדקה.
+**רק העמודים המרכזיים מהפרופיל** (3-8: בית, שירותים, ולפי הצורך אודות / צור קשר). לא סורקים את כל האתר.
+ברמת האתר, בדיקות קלות בלבד: robots.txt, תקינות מפת האתר (והאם העמודים המרכזיים בה, + מדגם קטן של כתובות),
+גישת בוטים של AI, HTTPS וגרסת הכתובת. מכבד robots.txt, בלי מפתחות ובלי שירות בתשלום. בדרך כלל פחות מ-15 שניות.
+כל ממצא, כל תיקון וכל שורה בדוח משויכים לעמוד מרכזי מסוים (או "כל האתר" לבדיקות האתר).
 קוראים את `seo-geo/audit-before.json` (לא רק את הפלט הקצר) ומציגים:
 
 ```
@@ -84,7 +87,7 @@ python3 SKILL/scripts/audit.py --url <האתר> --key-pages "<נתיבים מה�
 <תחום>: <ציון> · <תחום>: <ציון> ...  (שמונה תחומים, מהנמוך לגבוה)
 
 מה מצאתי (הכי חשוב קודם):
-1. <בעיה במילים של בעל עסק> - <למה זה חשוב לעסק, משפט אחד> (<כמה עמודים>)
+1. <בעיה במילים של בעל עסק> - <למה זה חשוב לעסק, משפט אחד> (<באילו עמודים מרכזיים>)
 ...
 מה כבר טוב: <2-3 דברים שעברו, למשל "ChatGPT ו-Claude יכולים לקרוא את האתר, בדקתי עם הבוט האמיתי">
 ```
