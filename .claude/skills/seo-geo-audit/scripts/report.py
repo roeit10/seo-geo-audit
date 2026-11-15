@@ -71,7 +71,7 @@ def main():
         delta = af["score"] - b["score"]
         w(f'''    <div class="arrow">←</div>
     <div class="score"><div class="num" style="color:{color_for(af["score"])}">{af["score"]}</div><div class="lbl">{e(after_label)}</div></div>
-    <div class="delta">{"+" if delta >= 0 else ""}{delta}</div>''')
+    <div class="delta" dir="ltr">{"+" if delta >= 0 else ""}{delta}</div>''')
     w('  </div>')
     s = b["summary"]
     w(f'  <div class="meta">נסרקו {s["pages_crawled"]} עמודים · {s["sitemap_urls"]} כתובות במפת האתר · '

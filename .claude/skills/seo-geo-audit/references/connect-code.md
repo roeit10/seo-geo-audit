@@ -55,7 +55,7 @@
 3. עורכים **רק** את מה שבתוכנית. שומרים על הסגנון של הקוד הקיים (קובץ SEO מרכזי? עורכים שם, לא בעמוד).
    אם יש באתר קובץ מקור אחד לכותרות ותיאורים (כמו `lib/seo.ts`), כל שינוי מטא נעשה שם.
 4. build: `npm run build` (או מה שבפרופיל). נכשל בגלל שינוי שלנו → מתקנים. לא בטוחים שזה מאיתנו? בודקים את main
-   בתיקייה נפרדת (`git worktree add /tmp/seo-geo-base main`, build שם). גם שם נכשל → הבעיה הייתה לפני; אומרים ועוצרים.
+   בתיקייה נפרדת (`git worktree add seo-geo/tmp/base main`, build שם). גם שם נכשל → הבעיה הייתה לפני; אומרים ועוצרים.
 5. `git add <הקבצים ששונו>` + `git commit -m "seo-geo: <תקציר>"`. **לא push.**
 6. `git diff main --stat` לדוח.
 
@@ -63,7 +63,7 @@
 
 ```bash
 # מריצים את הגרסה הבנויה ברקע, על פורט פנוי
-npx next start -p 3999 > /tmp/seo-geo-server.log 2>&1 &      # Next.js (Astro: npx astro preview --port 3999)
+npx next start -p 3999 > seo-geo/tmp/server.log 2>&1 &      # Next.js (Astro: npx astro preview --port 3999)
 # מחכים שיענה (עד 30 שניות)
 for i in $(seq 1 30); do curl -s -o /dev/null -w "%{http_code}" http://localhost:3999/ | grep -q 200 && break; sleep 1; done
 python3 SKILL/scripts/audit.py --url <האתר החי> --fetch-base http://localhost:3999 --inherit-live seo-geo/audit-before.json \
