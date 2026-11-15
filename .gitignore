@@ -1,0 +1,22 @@
+# מפתחות וסיסמאות - לעולם לא
+.env
+.env.*
+
+# הפלטים והדאטה של המשתמש
+seo-geo/
+context/
+outputs/
+
+# תיקיית הצילום ותכנון - לא לריפו הציבורי
+demo/
+.filming/
+script/
+publishing/
+VIDEO.md
+*תסריט*.md
+
+# מערכת
+.DS_Store
+__pycache__/
+*.pyc
+*.bak
